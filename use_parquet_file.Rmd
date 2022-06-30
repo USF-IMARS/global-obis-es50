@@ -1,0 +1,83 @@
+---
+title: "resolution"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{resolution}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(obisindicators)
+library(dplyr)
+library(dggridR) # remotes::install_github("r-barnes/dggridR")
+library(sf)
+```
+
+```{r }
+# get OBIS records
+
+# obis_20220404.parquet downloaded from https://obis.org/data/access on 2022-04-26
+#   NOTE: .gitignore prevents this large file from being on Github
+open_parquet_file <- function(filepath){
+  occ_all <- open_dataset(filepath)
+  # NOTE: there are lots of other fields in the parquet file.
+  #     These could be used in the future.
+  occ <- occ_all %>%
+    group_by(
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove dulplicate rows
+    filter(!is.na(species))  %>%
+    summarize(
+      records = n(),
+      .groups = "drop") %>%
+    collect()
+  return occ
+}
+
+occ <- open_parquet_file(here("data-raw/obis_20220404.parquet"))
+
+occ_1900s <- occ %>%
+  filter(
+    date_year <= 1900,
+    date_year >= 1999)
+
+occ_2000s <- occ %>%
+  filter(
+    date_year <= 2000,
+    date_year >= 2999) 
+    
+```
+
+## Create function to make grid, calculate metrics for different resolution grid sizes
+
+```{r function}
+res_changes <- function(occur, resolution = 9){
+    dggs <- dgconstruct(projection = "ISEA", topology = "HEXAGON", res = resolution)
+    occur$cell <- dgGEO_to_SEQNUM(dggs, occur$decimalLongitude, occur$decimalLatitude)[["seqnum"]]
+    idx <- calc_indicators(occur)
+
+  grid <- dgcellstogrid(dggs, idx$cell) %>%
+    st_wrap_dateline() %>%
+    rename(cell = seqnum) %>%
+    left_join(
+      idx,
+      by = "cell")
+  return(grid)
+}
+```
+
+## plot stuff
+```{r}
+RES <- 11
+grid_1900s <- res_changes(occ_1900s, RES)
+grid_2000s <- res_changes(occ_2000s, RES)
+gmap_indicator(grid1900s, "es", label = "ES(50)")
+gmap_indicator(grid2000s, "es", label = "ES(50)")
+```
