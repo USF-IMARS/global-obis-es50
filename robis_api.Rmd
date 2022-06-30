@@ -1,0 +1,68 @@
+---
+title: "resolution"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{resolution}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(obisindicators)
+library(dplyr)
+library(dggridR) # remotes::install_github("r-barnes/dggridR")
+library(sf)
+```
+
+```{r }
+
+# query OBIS for occurrence records
+occ <- robis::occurrence(
+  # TODO: use start & end date for API
+  startdate = NULL, enddate = NULL
+  
+  fields = c("decimalLongitude", "decimalLatitude", "species", "date_year", "aphiaID")
+  # TODO: figure out how to exclude species=NA records
+)
+
+# squish the data down into the shape expected by metric calculating code
+occ <- group_by(
+  occ, decimalLongitude, decimalLatitude, species, date_year) %>%  # remove dulplicate rows
+  filter(!is.na(species))  %>%
+  summarize(
+    records = n(),
+    .groups = "drop") %>%
+  collect()
+```
+
+## Create function to make grid, calculate metrics for different resolution grid sizes
+
+```{r function}
+res_changes <- function(resolution = 9){
+    dggs <- dgconstruct(projection = "ISEA", topology = "HEXAGON", res = resolution)
+    occ$cell <- dgGEO_to_SEQNUM(dggs, occ$decimalLongitude, occ$decimalLatitude)[["seqnum"]]
+    idx <- calc_indicators(occ)
+
+  grid <- dgcellstogrid(dggs, idx$cell) %>%
+    st_wrap_dateline() %>%
+    rename(cell = seqnum) %>%
+    left_join(
+      idx,
+      by = "cell")
+  return(grid)
+}
+```
+
+## plot stuff
+```{r}
+grid <- res_changes(11)
+gmap_indicator(grid, "es", label = "ES(50)")
+gmap_indicator(grid, "n", label = "# records")
+```
