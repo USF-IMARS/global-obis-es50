@@ -19,6 +19,7 @@ library(obisindicators)
 library(dplyr)
 library(dggridR) # remotes::install_github("r-barnes/dggridR")
 library(sf)
+library(arrow)
 ```
 
 ```{r }
@@ -32,26 +33,51 @@ open_parquet_file <- function(filepath){
   #     These could be used in the future.
   occ <- occ_all %>%
     group_by(
-      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove dulplicate rows
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows
     filter(!is.na(species))  %>%
     summarize(
       records = n(),
       .groups = "drop") %>%
     collect()
-  return occ
+  # return occ  #I'm not sure what this line is supposed to be doing
 }
 
-occ <- open_parquet_file(here("data-raw/obis_20220404.parquet"))
+#occ <- open_parquet_file(here(occ_all <- open_dataset("~/Github/global-obis-es50/obis_20220404.parquet"))) #also not sure what this one is doing
 
-occ_1900s <- occ %>%
+occ_1960s <- occ %>%
   filter(
-    date_year <= 1900,
-    date_year >= 1999)
+    date_year >= 1960,
+    date_year <= 1969)
+
+occ_1970s <- occ %>%
+  filter(
+    date_year >= 1970,
+    date_year <= 1979)
+
+occ_1980s <- occ %>%
+  filter(
+    date_year >= 1980,
+    date_year <= 1989)
+
+occ_1990s <- occ %>%
+  filter(
+    date_year >= 1990,
+    date_year <= 1999)
 
 occ_2000s <- occ %>%
   filter(
-    date_year <= 2000,
-    date_year >= 2999) 
+    date_year >= 2000,
+    date_year <= 2009)
+
+occ_2010s <- occ %>%
+  filter(
+    date_year >= 2010,
+    date_year <= 2019) 
+
+occ_2020s <- occ %>%
+  filter(
+    date_year >= 2020,
+    date_year <= 2029) 
     
 ```
 
@@ -75,9 +101,19 @@ res_changes <- function(occur, resolution = 9){
 
 ## plot stuff
 ```{r}
-RES <- 11
-grid_1900s <- res_changes(occ_1900s, RES)
+RES <- 6
+grid_1960s <- res_changes(occ_1960s, RES)
+grid_1970s <- res_changes(occ_1970s, RES)
+grid_1980s <- res_changes(occ_1980s, RES)
+grid_1990s <- res_changes(occ_1990s, RES)
 grid_2000s <- res_changes(occ_2000s, RES)
-gmap_indicator(grid1900s, "es", label = "ES(50)")
-gmap_indicator(grid2000s, "es", label = "ES(50)")
+grid_2010s <- res_changes(occ_2010s, RES)
+grid_2020s <- res_changes(occ_2020s, RES)
+gmap_indicator(grid_1960s, "es", label = "ES(50)")
+gmap_indicator(grid_1970s, "es", label = "ES(50)")
+gmap_indicator(grid_1980s, "es", label = "ES(50)")
+gmap_indicator(grid_1990s, "es", label = "ES(50)")
+gmap_indicator(grid_2000s, "es", label = "ES(50)")
+gmap_indicator(grid_2010s, "es", label = "ES(50)")
+gmap_indicator(grid_2020s, "es", label = "ES(50)")
 ```
