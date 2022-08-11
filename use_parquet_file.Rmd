@@ -20,6 +20,8 @@ library(dplyr)
 library(dggridR) # remotes::install_github("r-barnes/dggridR")
 library(sf)
 library(arrow)
+library(magick)
+library(ggplot2)
 ```
 
 ```{r }
@@ -27,7 +29,7 @@ library(arrow)
 
 # obis_20220404.parquet downloaded from https://obis.org/data/access on 2022-04-26
 #   NOTE: .gitignore prevents this large file from being on Github
-filepath <- "~/Github/global-obis-es50/obis_20220404.parquet"
+
 open_parquet_file <- function(filepath){
   occ_all <- open_dataset(filepath)
   # NOTE: there are lots of other fields in the parquet file.
@@ -111,11 +113,41 @@ grid_1990s <- res_changes(occ_1990s, RES)
 grid_2000s <- res_changes(occ_2000s, RES)
 grid_2010s <- res_changes(occ_2010s, RES)
 grid_2020s <- res_changes(occ_2020s, RES)
-gmap_indicator(grid_1960s, "es", label = "ES(50)")
-gmap_indicator(grid_1970s, "es", label = "ES(50)")
-gmap_indicator(grid_1980s, "es", label = "ES(50)")
-gmap_indicator(grid_1990s, "es", label = "ES(50)")
-gmap_indicator(grid_2000s, "es", label = "ES(50)")
-gmap_indicator(grid_2010s, "es", label = "ES(50)")
-gmap_indicator(grid_2020s, "es", label = "ES(50)")
+
+map_1960s <- gmap_indicator(grid_1960s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_1960s.png", plot=map_1960s,width=4,height=4,units="in",scale=1)
+png_map_1960s <- image_read("images/map_obis_es_1960s.png")
+
+map_1970s <- gmap_indicator(grid_1970s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_1970s.png", plot=map_1970s,width=4,height=4,units="in",scale=1)
+png_map_1970s <- image_read("images/map_obis_es_1970s.png")
+
+map_1980s <- gmap_indicator(grid_1980s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_1980s.png", plot=map_1980s,width=4,height=4,units="in",scale=1)
+png_map_1980s <- image_read("images/map_obis_es_1980s.png")
+
+map_1990s <- gmap_indicator(grid_1990s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_1990s.png", plot=map_1990s,width=4,height=4,units="in",scale=1)
+png_map_1990s <- image_read("images/map_obis_es_1990s.png")
+
+map_2000s <- gmap_indicator(grid_2000s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_2000s.png", plot=map_2000s,width=4,height=4,units="in",scale=1)
+png_map_2000s <- image_read("images/map_obis_es_2000s.png")
+
+map_2010s <- gmap_indicator(grid_2010s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_2010s.png", plot=map_2010s,width=4,height=4,units="in",scale=1)
+png_map_2010s <- image_read("images/map_obis_es_2010s.png")
+
+map_2020s <- gmap_indicator(grid_2020s, "es", label = "ES(50)")
+ggsave(filename = "images/map_obis_es_2020s.png", plot=map_2020s,width=4,height=4,units="in",scale=1)
+png_map_2020s <- image_read("images/map_obis_es_2020s.png")
+```
+## create animated gif
+```{r}
+img <- c(png_map_1960s, png_map_1970s, png_map_1980s, png_map_1990s, png_map_2000s, png_map_2010s, png_map_2020s)
+
+image_append(image_scale(img, "x200"))
+
+obis_es50_gif <- image_animate(image_scale(img, "1200x1200"), fps = 1, dispose = "previous")
+image_write(obis_es50_gif, "images/obis_es50.gif")
 ```
