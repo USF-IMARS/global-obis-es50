@@ -27,6 +27,7 @@ library(arrow)
 
 # obis_20220404.parquet downloaded from https://obis.org/data/access on 2022-04-26
 #   NOTE: .gitignore prevents this large file from being on Github
+filepath <- "~/Github/global-obis-es50/obis_20220404.parquet"
 open_parquet_file <- function(filepath){
   occ_all <- open_dataset(filepath)
   # NOTE: there are lots of other fields in the parquet file.
@@ -42,7 +43,8 @@ open_parquet_file <- function(filepath){
   # return occ  #I'm not sure what this line is supposed to be doing
 }
 
-#occ <- open_parquet_file(here(occ_all <- open_dataset("~/Github/global-obis-es50/obis_20220404.parquet"))) #also not sure what this one is doing
+
+occ <- open_parquet_file("~/Github/global-obis-es50/obis_20220404.parquet")
 
 occ_1960s <- occ %>%
   filter(

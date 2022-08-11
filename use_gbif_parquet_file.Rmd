@@ -21,11 +21,11 @@ library(dggridR) # remotes::install_github("r-barnes/dggridR")
 library(sf)
 library(arrow)
 library(magick)
+library(ggplot2)
 ```
 
-```{r }
 # get GBIF records
-filepath <- "s3://gbif-open-data-eu-central-1/occurrence/2022-07-01/occurrence.parquet"
+```{r }
 
 open_parquet_file <- function(filepath){
   occ_all <- open_dataset(filepath)
@@ -44,6 +44,7 @@ open_parquet_file <- function(filepath){
   # return occ  #I'm not sure what this line is supposed to be doing
 }
 
+occ <- open_parquet_file("s3://gbif-open-data-eu-central-1/occurrence/2022-07-01/occurrence.parquet")
 
 occ_1960s <- occ %>%
   filter(
