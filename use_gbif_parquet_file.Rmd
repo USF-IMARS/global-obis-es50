@@ -136,8 +136,8 @@ ggsave(filename = "images/map_gbif_es_2010s.png", plot=map_2010s,width=4,height=
 png_map_2010s <- image_read("images/map_gbif_es_2010s.png")
 
 map_2020s <- gmap_indicator(grid_2020s, "es", label = "ES(50)")
-ggsave(filename = "images/map_es_2020s.png", plot=map_2020s,width=4,height=4,units="in",scale=1)
-png_map_2020s <- image_read("images/map_es_2020s.png")
+ggsave(filename = "images/map_gbif_es_2020s.png", plot=map_2020s,width=4,height=4,units="in",scale=1)
+png_map_2020s <- image_read("images/map_gbif_es_2020s.png")
 ```
 
 ## create animated gif
