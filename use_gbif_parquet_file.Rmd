@@ -1,0 +1,144 @@
+---
+title: "resolution"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{resolution}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(obisindicators)
+library(dplyr)
+library(dggridR) # remotes::install_github("r-barnes/dggridR")
+library(sf)
+library(arrow)
+library(magick)
+```
+
+```{r }
+# get GBIF records
+filepath <- "s3://gbif-open-data-eu-central-1/occurrence/2022-07-01/occurrence.parquet"
+
+open_parquet_file <- function(filepath){
+  occ_all <- open_dataset(filepath)
+  # NOTE: there are lots of other fields in the parquet file.
+  #     These could be used in the future.
+  occ <- occ_all %>%
+    group_by(
+      decimallongitude, decimallatitude, species, year) %>%  # remove duplicate rows
+    # In OBIS it's date_year and it's calculated for all records I believe, I'm not
+    # sure if the same is true for year in GBIF- how do we check?
+    filter(!is.na(species))  %>%
+    summarize(
+      records = n(),
+      .groups = "drop") %>%
+    collect()
+  # return occ  #I'm not sure what this line is supposed to be doing
+}
+
+
+occ_1960s <- occ %>%
+  filter(
+    date_year >= 1960,
+    date_year <= 1969)
+
+occ_1970s <- occ %>%
+  filter(
+    date_year >= 1970,
+    date_year <= 1979)
+
+occ_1980s <- occ %>%
+  filter(
+    date_year >= 1980,
+    date_year <= 1989)
+
+occ_1990s <- occ %>%
+  filter(
+    date_year >= 1990,
+    date_year <= 1999)
+
+occ_2000s <- occ %>%
+  filter(
+    date_year >= 2000,
+    date_year <= 2009)
+
+occ_2010s <- occ %>%
+  filter(
+    date_year >= 2010,
+    date_year <= 2019) 
+
+occ_2020s <- occ %>%
+  filter(
+    date_year >= 2020,
+    date_year <= 2029) 
+    
+```
+
+## Create function to make grid, calculate metrics for different resolution grid sizes
+
+```{r function}
+res_changes <- function(occur, resolution = 9){
+    dggs <- dgconstruct(projection = "ISEA", topology = "HEXAGON", res = resolution)
+    occur$cell <- dgGEO_to_SEQNUM(dggs, occur$decimalLongitude, occur$decimalLatitude)[["seqnum"]]
+    idx <- calc_indicators(occur)
+
+  grid <- dgcellstogrid(dggs, idx$cell) %>%
+    st_wrap_dateline() %>%
+    rename(cell = seqnum) %>%
+    left_join(
+      idx,
+      by = "cell")
+  return(grid)
+}
+```
+
+## plot stuff
+```{r}
+RES <- 6
+grid_1960s <- res_changes(occ_1960s, RES)
+grid_1970s <- res_changes(occ_1970s, RES)
+grid_1980s <- res_changes(occ_1980s, RES)
+grid_1990s <- res_changes(occ_1990s, RES)
+grid_2000s <- res_changes(occ_2000s, RES)
+grid_2010s <- res_changes(occ_2010s, RES)
+grid_2020s <- res_changes(occ_2020s, RES)
+map_1960s <- gmap_indicator(grid_1960s, "es", label = "ES(50)")
+ggsave(filename = "map_es_1960s.png", plot=map_1960s,width=4,height=4,units="in",scale=1)
+png_map_1960s <- image_read("map_es_1960s.png")
+map_1970s <- gmap_indicator(grid_1970s, "es", label = "ES(50)")
+ggsave(filename = "map_es_1970s.png", plot=map_1970s,width=4,height=4,units="in",scale=1)
+png_map_1970s <- image_read("map_es_1970s.png")
+map_1980s <- gmap_indicator(grid_1980s, "es", label = "ES(50)")
+ggsave(filename = "map_es_1980s.png", plot=map_1980s,width=4,height=4,units="in",scale=1)
+png_map_1980s <- image_read("map_es_1980s.png")
+map_1990s <- gmap_indicator(grid_1990s, "es", label = "ES(50)")
+ggsave(filename = "map_es_1990s.png", plot=map_1990s,width=4,height=4,units="in",scale=1)
+png_map_1990s <- image_read("map_es_1990s.png")
+map_2000s <- gmap_indicator(grid_2000s, "es", label = "ES(50)")
+ggsave(filename = "map_es_2000s.png", plot=map_2000s,width=4,height=4,units="in",scale=1)
+png_map_2000s <- image_read("map_es_2000s.png")
+map_2010s <- gmap_indicator(grid_2010s, "es", label = "ES(50)")
+ggsave(filename = "map_es_2010s.png", plot=map_2010s,width=4,height=4,units="in",scale=1)
+png_map_2010s <- image_read("map_es_2010s.png")
+map_2020s <- gmap_indicator(grid_2020s, "es", label = "ES(50)")
+ggsave(filename = "map_es_2020s.png", plot=map_2020s,width=4,height=4,units="in",scale=1)
+png_map_2020s <- image_read("map_es_2020s.png")
+```
+
+## create animated gif
+```{r}
+img <- c(png_map_1960s, png_map_1970s, png_map_1980s, png_map_1990s, png_map_2000s, png_map_2010s, png_map_2020s)
+
+image_append(image_scale(img, "x200"))
+
+gbif_es50_gif <- image_animate(image_scale(img, "1200x1200"), fps = 1, dispose = "previous")
+image_write(gbif_es50_gif, "gbif_es50.gif")
+```
