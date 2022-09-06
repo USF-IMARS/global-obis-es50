@@ -1,0 +1,224 @@
+---
+title: "resolution"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{resolution}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(obisindicators)
+library(dplyr)
+library(dggridR) # remotes::install_github("r-barnes/dggridR")
+library(sf)
+library(arrow)
+library(magick)
+library(ggplot2)
+```
+
+```{r }
+# get OBIS records
+
+# obis_20220404.parquet downloaded from https://obis.org/data/access on 2022-04-26
+#   NOTE: .gitignore prevents this large file from being on Github
+
+open_parquet_file <- function(filepath){
+  occ_all <- open_dataset(filepath)
+  # NOTE: there are lots of other fields in the parquet file.
+  #     These could be used in the future.
+  occ <- occ_all %>%
+    group_by(
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows
+    filter(!is.na(species))  %>%
+    summarize(
+      records = n(),
+      .groups = "drop") %>%
+    collect()
+  # return occ  #I'm not sure what this line is supposed to be doing
+}
+
+
+occ <- open_parquet_file("obis_20220710.parquet")
+
+occ_1960s <- occ %>%
+  filter(
+    date_year >= 1960,
+    date_year <= 1969)
+
+# occ_1970s <- occ %>%
+#   filter(
+#     date_year >= 1970,
+#     date_year <= 1979)
+# 
+# occ_1980s <- occ %>%
+#   filter(
+#     date_year >= 1980,
+#     date_year <= 1989)
+# 
+# occ_1990s <- occ %>%
+#   filter(
+#     date_year >= 1990,
+#     date_year <= 1999)
+# 
+# occ_2000s <- occ %>%
+#   filter(
+#     date_year >= 2000,
+#     date_year <= 2009)
+# 
+# occ_2010s <- occ %>%
+#   filter(
+#     date_year >= 2010,
+#     date_year <= 2019) 
+# 
+# occ_2020s <- occ %>%
+#   filter(
+#     date_year >= 2020,
+#     date_year <= 2029) 
+    
+```
+
+## Create function to make grid, calculate metrics for different resolution grid sizes
+
+```{r function}
+res_changes <- function(occur, resolution = 9){
+    dggs <- dgconstruct(projection = "ISEA", topology = "HEXAGON", res = resolution)
+    occur$cell <- dgGEO_to_SEQNUM(dggs, occur$decimalLongitude, occur$decimalLatitude)[["seqnum"]]
+    idx <- calc_indicators(occur)
+
+  grid <- dgcellstogrid(dggs, idx$cell) %>%
+    st_wrap_dateline() %>%
+    rename(cell = seqnum) %>%
+    left_join(
+      idx,
+      by = "cell")
+  return(grid)
+}
+```
+
+## Make Grid
+```{r}
+RES <- 6
+grid_1960s <- res_changes(occ_1960s, RES)
+# grid_1970s <- res_changes(occ_1970s, RES)
+# grid_1980s <- res_changes(occ_1980s, RES)
+# grid_1990s <- res_changes(occ_1990s, RES)
+# grid_2000s <- res_changes(occ_2000s, RES)
+# grid_2010s <- res_changes(occ_2010s, RES)
+# grid_2020s <- res_changes(occ_2020s, RES)
+```
+
+## Make plot and save
+```{r}
+# map_1960s <- gmap_indicator(grid_1960s, 
+#                             "es", 
+#                             label = "ES(50)",
+#                             crs="+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
+#                             )
+
+grid <- grid_1960s
+column <- "es"
+label <- "ES(50)"
+trans <- "identity"
+crs <- "+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
+
+
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+bb <- sf::st_bbox(
+    st_transform(grid, crs))
+
+
+map_1960s <- ggplot() +
+    geom_sf(
+      data = grid, aes_string(
+        fill = column, geometry = "geometry"), show.legend = FALSE, lwd = 0) +
+    viridis::scale_color_viridis(
+      option = "inferno", na.value = "white",
+      name = label, trans = trans) +
+    viridis::scale_fill_viridis(
+      option = "inferno", na.value = "white",
+      name = label, trans = trans) +
+    geom_sf(
+      data = world, fill = "#dddddd", color = NA) +
+    xlab("") + ylab("") +
+    coord_sf(
+      crs  = crs,
+      xlim = bb[c("xmin","xmax")],
+      ylim = bb[c("ymin","ymax")]) +
+    theme(
+      # panel.grid.major.x = element_blank(),
+      # panel.grid.major.y = element_blank(),
+      # panel.grid.minor.x = element_blank(),
+      # panel.grid.minor.y = element_blank(),
+      panel.background = element_blank(),
+      # axis.text.x = element_blank(),
+      # axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text = element_blank(),
+      panel.grid = element_blank(),
+      plot.margin = margin(0,0,0,0, "cm"))
+      #plot.margin = margin(0.01, 0.01, 0.01, 0.01, "pt"))+
+      #plot.background = element_blank(),
+      #panel.border = element_blank()) +
+
+#theme_collapse()
+
+
+map_1960s
+
+filename <- "images/map_obis_es_1960s_test.jpg"
+
+ggsave(filename = filename,
+       plot=map_1960s,
+       width=16000,
+       height=8000,
+       units="px",
+       scale=1,
+       limitsize = FALSE)
+
+knitr::plot_crop(filename)
+
+# png_map_1960s <- image_read("images/map_obis_es_1960s_test.png")
+
+# map_1970s <- gmap_indicator(grid_1970s, "es", label = "ES(50)")
+# ggsave(filename = "images/map_obis_es_1970s.png", plot=map_1970s,width=4,height=4,units="in",scale=1)
+# png_map_1970s <- image_read("images/map_obis_es_1970s.png")
+# 
+# map_1980s <- gmap_indicator(grid_1980s, "es", label = "ES(50)")
+# ggsave(filename = "images/map_obis_es_1980s.png", plot=map_1980s,width=4,height=4,units="in",scale=1)
+# png_map_1980s <- image_read("images/map_obis_es_1980s.png")
+# 
+# map_1990s <- gmap_indicator(grid_1990s, "es", label = "ES(50)")
+# ggsave(filename = "images/map_obis_es_1990s.png", plot=map_1990s,width=4,height=4,units="in",scale=1)
+# png_map_1990s <- image_read("images/map_obis_es_1990s.png")
+# 
+# map_2000s <- gmap_indicator(grid_2000s, "es", label = "ES(50)")
+# ggsave(filename = "images/map_obis_es_2000s.png", plot=map_2000s,width=4,height=4,units="in",scale=1)
+# png_map_2000s <- image_read("images/map_obis_es_2000s.png")
+# 
+# map_2010s <- gmap_indicator(grid_2010s, "es", label = "ES(50)")
+# ggsave(filename = "images/map_obis_es_2010s.png", plot=map_2010s,width=4,height=4,units="in",scale=1)
+# png_map_2010s <- image_read("images/map_obis_es_2010s.png")
+# 
+# map_2020s <- gmap_indicator(grid_2020s, "es", label = "ES(50)")
+# ggsave(filename = "images/map_obis_es_2020s.png", plot=map_2020s,width=4,height=4,units="in",scale=1)
+# png_map_2020s <- image_read("images/map_obis_es_2020s.png")
+```
+## create animated gif
+```{r}
+# img <- c(png_map_1960s, png_map_1970s, png_map_1980s, png_map_1990s, png_map_2000s, png_map_2010s, png_map_2020s)
+# 
+# image_append(image_scale(img, "x200"))
+# 
+# obis_es50_gif <- image_animate(image_scale(img, "1200x1200"), fps = 1, dispose = "previous")
+# image_write(obis_es50_gif, "images/obis_es50.gif")
+```
