@@ -146,7 +146,7 @@ map_1960s <- ggplot() +
       option = "inferno", na.value = "white",
       name = label, trans = trans) +
     geom_sf(
-      data = world, fill = "#dddddd", color = NA) +
+      data = world, fill = "#000000", color = NA) +
     xlab("") + ylab("") +
     coord_sf(
       crs  = crs,
@@ -185,7 +185,13 @@ ggsave(filename = filename,
        scale=1,
        limitsize = FALSE)
 
-knitr::plot_crop(filename)
+ime <- image_read(filename)
+
+ime <- image_trim(ime,fuzz=10)
+
+image_write(ime, path = filename, format = "jpg")
+
+# knitr::plot_crop(filename, fuzz=50)
 
 # png_map_1960s <- image_read("images/map_obis_es_1960s_test.png")
 
