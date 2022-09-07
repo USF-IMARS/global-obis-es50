@@ -24,66 +24,6 @@ library(magick)
 library(ggplot2)
 ```
 
-```{r }
-# get OBIS records
-
-# obis_20220404.parquet downloaded from https://obis.org/data/access on 2022-04-26
-#   NOTE: .gitignore prevents this large file from being on Github
-
-open_parquet_file <- function(filepath){
-  occ_all <- open_dataset(filepath)
-  # NOTE: there are lots of other fields in the parquet file.
-  #     These could be used in the future.
-  occ <- occ_all %>%
-    group_by(
-      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows
-    filter(!is.na(species))  %>%
-    summarize(
-      records = n(),
-      .groups = "drop") %>%
-    collect()
-  # return occ  #I'm not sure what this line is supposed to be doing
-}
-
-
-occ <- open_parquet_file("obis_20220710.parquet")
-
-occ_1960s <- occ %>%
-  filter(
-    date_year >= 1960,
-    date_year <= 1969)
-
-# occ_1970s <- occ %>%
-#   filter(
-#     date_year >= 1970,
-#     date_year <= 1979)
-# 
-# occ_1980s <- occ %>%
-#   filter(
-#     date_year >= 1980,
-#     date_year <= 1989)
-# 
-# occ_1990s <- occ %>%
-#   filter(
-#     date_year >= 1990,
-#     date_year <= 1999)
-# 
-# occ_2000s <- occ %>%
-#   filter(
-#     date_year >= 2000,
-#     date_year <= 2009)
-# 
-# occ_2010s <- occ %>%
-#   filter(
-#     date_year >= 2010,
-#     date_year <= 2019) 
-# 
-# occ_2020s <- occ %>%
-#   filter(
-#     date_year >= 2020,
-#     date_year <= 2029) 
-    
-```
 
 ## Create function to make grid, calculate metrics for different resolution grid sizes
 
@@ -103,122 +43,139 @@ res_changes <- function(occur, resolution = 9){
 }
 ```
 
-## Make Grid
-```{r}
-RES <- 6
-grid_1960s <- res_changes(occ_1960s, RES)
-# grid_1970s <- res_changes(occ_1970s, RES)
-# grid_1980s <- res_changes(occ_1980s, RES)
-# grid_1990s <- res_changes(occ_1990s, RES)
-# grid_2000s <- res_changes(occ_2000s, RES)
-# grid_2010s <- res_changes(occ_2010s, RES)
-# grid_2020s <- res_changes(occ_2020s, RES)
-```
+## Create a function for plotting
 
-## Make plot and save
-```{r}
-# map_1960s <- gmap_indicator(grid_1960s, 
-#                             "es", 
-#                             label = "ES(50)",
-#                             crs="+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
-#                             )
+```{r function}
 
-grid <- grid_1960s
-column <- "es"
-label <- "ES(50)"
-trans <- "identity"
-crs <- "+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
+gmap <- function(
+    grid, column = "shannon", label = "Shannon index", trans = "identity",
+    crs="+proj=robin +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs",
+    limits = c(0,8)) {
+  
+  world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+  bb <- sf::st_bbox(st_transform(grid, crs))
 
-
-world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
-bb <- sf::st_bbox(
-    st_transform(grid, crs))
-
-
-map_1960s <- ggplot() +
+  ggplot() +
+    
     geom_sf(
       data = grid, aes_string(
-        fill = column, geometry = "geometry"), show.legend = FALSE, lwd = 0) +
+        fill = column, geometry = "geometry"), show.legend = FALSE, lwd=0) +
+    
     viridis::scale_color_viridis(
       option = "inferno", na.value = "white",
-      name = label, trans = trans) +
+      name = label, trans = trans, limits = limits) +
+    
     viridis::scale_fill_viridis(
       option = "inferno", na.value = "white",
-      name = label, trans = trans) +
+      name = label, trans = trans, limits = limits) +
+    
     geom_sf(
       data = world, fill = "#000000", color = NA) +
+    
     xlab("") + ylab("") +
+    
     coord_sf(
       crs  = crs,
       xlim = bb[c("xmin","xmax")],
       ylim = bb[c("ymin","ymax")]) +
+    
     theme(
-      # panel.grid.major.x = element_blank(),
-      # panel.grid.major.y = element_blank(),
-      # panel.grid.minor.x = element_blank(),
-      # panel.grid.minor.y = element_blank(),
-      panel.background = element_blank(),
-      # axis.text.x = element_blank(),
-      # axis.text.y = element_blank(),
+      panel.background = element_rect(fill = "grey",
+                                colour = "grey",
+                                size = 0, linetype = "blank"),
       axis.ticks = element_blank(),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
       axis.text = element_blank(),
       panel.grid = element_blank(),
       plot.margin = margin(0,0,0,0, "cm"))
-      #plot.margin = margin(0.01, 0.01, 0.01, 0.01, "pt"))+
-      #plot.background = element_blank(),
-      #panel.border = element_blank()) +
+}
+```
 
-#theme_collapse()
+# Lets do some work!
+
+## Get the OBIS records
+```{r }
+# get OBIS records
+
+# obis_20220710.parquet downloaded from https://obis.org/data/access on 2022-09-06
+#   NOTE: .gitignore prevents this large file from being on Github
+
+open_parquet_file <- function(filepath){
+  occ_all <- open_dataset(filepath)
+  # NOTE: there are lots of other fields in the parquet file.
+  #     These could be used in the future.
+  occ <- occ_all %>%
+    group_by(
+      decimalLongitude, decimalLatitude, species, date_year) %>%  # remove duplicate rows
+    filter(!is.na(species))  %>%
+    summarize(
+      records = n(),
+      .groups = "drop") %>%
+    collect()
+  # return occ  #I'm not sure what this line is supposed to be doing
+}
 
 
-map_1960s
+occ <- open_parquet_file("obis_20220710.parquet")
+    
+```
 
-filename <- "images/map_obis_es_1960s_test.jpg"
+## Create maps by decade (this takes some time)
 
-ggsave(filename = filename,
-       plot=map_1960s,
+```{r}
+# Filer by decade
+decs <- seq(1960, 2020, by=10)
+
+# grid resolution
+RES <- 6
+
+# map defaults
+column <- "es"
+label <- "ES(50)"
+trans <- "identity"
+crs <- "+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
+limits <- c(0,50)
+
+
+for (dec in decs){
+  
+  dec_beg = dec
+  dec_end = dec_beg+9
+  
+  occ_dec <- occ %>%
+    filter(
+      date_year >= dec_beg,
+      date_year <= dec_end)
+  
+  # make grid
+  grid_dec <- res_changes(occ_dec, RES)
+  
+  # make map
+  map <- gmap(grid_dec, column, label = label, trans = trans, crs = crs, limits = limits)
+
+  # save map
+  filename <- sprintf("images/globe/map_obis_%s.jpg",dec_beg)
+
+  ggsave(filename = filename,
+       plot=map,
        width=16000,
        height=8000,
        units="px",
        scale=1,
        limitsize = FALSE)
 
-ime <- image_read(filename)
-
-ime <- image_trim(ime,fuzz=10)
-
-image_write(ime, path = filename, format = "jpg")
-
-# knitr::plot_crop(filename, fuzz=50)
-
-# png_map_1960s <- image_read("images/map_obis_es_1960s_test.png")
-
-# map_1970s <- gmap_indicator(grid_1970s, "es", label = "ES(50)")
-# ggsave(filename = "images/map_obis_es_1970s.png", plot=map_1970s,width=4,height=4,units="in",scale=1)
-# png_map_1970s <- image_read("images/map_obis_es_1970s.png")
-# 
-# map_1980s <- gmap_indicator(grid_1980s, "es", label = "ES(50)")
-# ggsave(filename = "images/map_obis_es_1980s.png", plot=map_1980s,width=4,height=4,units="in",scale=1)
-# png_map_1980s <- image_read("images/map_obis_es_1980s.png")
-# 
-# map_1990s <- gmap_indicator(grid_1990s, "es", label = "ES(50)")
-# ggsave(filename = "images/map_obis_es_1990s.png", plot=map_1990s,width=4,height=4,units="in",scale=1)
-# png_map_1990s <- image_read("images/map_obis_es_1990s.png")
-# 
-# map_2000s <- gmap_indicator(grid_2000s, "es", label = "ES(50)")
-# ggsave(filename = "images/map_obis_es_2000s.png", plot=map_2000s,width=4,height=4,units="in",scale=1)
-# png_map_2000s <- image_read("images/map_obis_es_2000s.png")
-# 
-# map_2010s <- gmap_indicator(grid_2010s, "es", label = "ES(50)")
-# ggsave(filename = "images/map_obis_es_2010s.png", plot=map_2010s,width=4,height=4,units="in",scale=1)
-# png_map_2010s <- image_read("images/map_obis_es_2010s.png")
-# 
-# map_2020s <- gmap_indicator(grid_2020s, "es", label = "ES(50)")
-# ggsave(filename = "images/map_obis_es_2020s.png", plot=map_2020s,width=4,height=4,units="in",scale=1)
-# png_map_2020s <- image_read("images/map_obis_es_2020s.png")
+  ime <- image_read(filename)
+  # 
+  # crop map
+  ime <- image_crop(ime,"14546x7294+727")
+  # ime <- image_trim(ime,fuzz=10)
+  # 
+  image_write(ime, path = filename, format = "jpg")
+  
+}
 ```
+
 ## create animated gif
 ```{r}
 # img <- c(png_map_1960s, png_map_1970s, png_map_1980s, png_map_1990s, png_map_2000s, png_map_2010s, png_map_2020s)
