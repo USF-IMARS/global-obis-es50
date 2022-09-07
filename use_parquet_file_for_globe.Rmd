@@ -53,7 +53,9 @@ gmap <- function(
     limits = c(0,8)) {
   
   world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
-  bb <- sf::st_bbox(st_transform(grid, crs))
+  bbglobe <- 'POLYGON ((-180 -90, 180 -90, 180 90, -180 90, -180 -90))'
+  sfc <- st_as_sfc(bbglobe,crs='+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0')
+  bb <- sf::st_bbox(st_transform(sfc, crs))
 
   ggplot() +
     
@@ -168,7 +170,7 @@ for (dec in decs){
   ime <- image_read(filename)
   # 
   # crop map
-  ime <- image_crop(ime,"14546x7294+727")
+  ime <- image_crop(ime,"14546x7294+727+348")
   # ime <- image_trim(ime,fuzz=10)
   # 
   image_write(ime, path = filename, format = "jpg")
